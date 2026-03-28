@@ -1,2 +1,2 @@
 # Darkly
-42 Darkly - Advanced Curriculum Project 
+42 Advanced Curriculum Project 
