@@ -1,4 +1,4 @@
-# 🚩 4 : SQL Injection (Image Search)
+# 🚩 5 : SQL Injection (Image Search)
 
 ---
 
@@ -129,14 +129,14 @@ echo -n "albatroz" | sha256sum
 ## 🏁 Result
 
 ```
-FLAG: a29020ef3132e01dd61df97fd33ec8d7fcd1388cc9601e7db691d17d4d6188
+FLAG: f2a29020ef3132e01dd61df97fd33ec8d7fcd1388cc9601e7db691d17d4d6188
 ```
 
 ---
 
 ## 🌍 Real-World Impact
 
-Same critical impact as any SQL injection — see breach #3 for full details.
+Same critical impact as any SQL injection — see breach #4 for full details.
 The additional concern here is the **systemic nature** of the vulnerability:
 
 **Systemic Failure**
@@ -157,7 +157,7 @@ including fields the developer never intended to be public.
 
 ### 1. Use Parameterized Queries Everywhere
 
-The fix is identical to breach #3 — prepared statements must be applied
+The fix is identical to breach #4 — prepared statements must be applied
 consistently across every database query in the application, not just
 on some pages:
 
@@ -185,7 +185,7 @@ must never make it into production systems.
 
 ### 4. Never Expose Database Errors
 
-Same as breach #3 — raw error messages reveal query structure and
+Same as breach #4 — raw error messages reveal query structure and
 database type to attackers. Always catch and log errors privately.
 
 ---
