@@ -83,7 +83,6 @@ There were two notes left by the developer that were invisible on screen
 but readable in the raw code:
 
 ```html
-
 <!-- You must come from : "https://www.nsa.gov/" -->
 <!-- Let's use this browser: "ft_bornToSec". It will help you a lot. -->
 ```
