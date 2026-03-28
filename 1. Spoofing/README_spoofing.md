@@ -83,6 +83,7 @@ There were two notes left by the developer that were invisible on screen
 but readable in the raw code:
 
 ```html
+
 <!-- You must come from : "https://www.nsa.gov/" -->
 <!-- Let's use this browser: "ft_bornToSec". It will help you a lot. -->
 ```
@@ -144,38 +145,7 @@ what it expects, and rewards us with the flag.
 
 ---
 
-#### Option B: Browser Environment Manipulation via JavaScript Console
-
-If one prefers to work directly within a browser, one can use the built-in
-**Developer Console** (opened with F12 or Cmd+Option+J on Mac) to temporarily
-redefine the environment properties that the site reads:
-
-```javascript
-// Override the document's referrer property to fake the origin
-Object.defineProperty(document, 'referrer', {
-  value: 'https://www.nsa.gov/',
-  writable: false
-});
-
-// Spoof the browser's User-Agent string
-Object.defineProperty(navigator, 'userAgent', {
-  get: () => 'ft_bornToSec'
-});
-```
-
-What this does:
-- `Object.defineProperty` is a JavaScript function that lets you redefine
-  built-in browser properties
-- We redefine `document.referrer` (what the browser reports as the previous
-  page) to be the NSA website
-- We redefine `navigator.userAgent` (what the browser reports as its name)
-  to be `ft_bornToSec`
-- After running these two lines, any JavaScript on the page that reads these
-  values will get our fake values instead of the real ones
-
----
-
-#### Option C: Burp Suite (Professional Tool)
+#### Option B: Burp Suite (Professional Tool)
 
 Burp Suite is a professional web security testing platform used by penetration
 testers worldwide. It works as a **proxy**, sitting between one's browser and
@@ -192,11 +162,19 @@ With Burp Suite one would:
 
 ---
 
-#### Option D: ModHeader extension
+#### Option C: ModHeader extension
 
-Another easy way to modify the header is to add an extension like ModHeader to the browser and then tamper with Referer and User-Agent. This was actually the first method we used to get the flag.
+Another easy way to modify the header is to add an extension like ModHeader to the browser and then tamper with Referer and User-Agent. It lets you add or override any HTTP header for every request your browser makes.
 
+This is actually the method we used to get the flag.
 
+Steps for this option: 
+
+1. Install ModHeader from the browser
+2. Click the extension icon
+3. Add a Request Header: Name = Referer, Value = https://www.nsa.gov/
+4. Add another: Name = User-Agent, Value = ft_bornToSec
+5. Visit the albatross page — the headers are automatically sent
 
 ### Step 4: The Result
 
