@@ -46,6 +46,8 @@ Tu veux de l'aide ? Moi aussi !     You want help? Me too!
 
 These are deliberate decoys designed to frustrate manual searching. If you were clicking through folders one by one, you would spend hours reading these and never find the real flag. The script cuts through all of them by reading every README and printing only the ones it has not seen before. The flag stands out immediately because it looks nothing like the French phrases.
 
+---
+
 ## 🛠 The Exploit
 
 ### Step 1: Discover the path
@@ -161,17 +163,23 @@ crawl(base)
 
 This version visits every folder it can find, tries to read a README at each level, and only stops when it reaches depth 5 or runs out of subfolders. The `try/except` handles the case where no README exists at a given level without crashing.
 
+---
+
 ## 🏁 Result
 
 ```
 FLAG: d5eec3ec36cf80dce44a896f961c1831a05526ec215693c8f2c39543497d4466
 ```
 
+---
+
 ## 🌍 Real-World Impact
 
 Directory listing on its own might seem minor. You can see filenames but not necessarily sensitive data. Combined with other failures it becomes much more serious. Here this vulnerability allowed us to enumerate the entire hidden directory structure of the server, which would expose any sensitive files sitting inside it: configuration files, backups, credentials, source code.
 
 In real-world incidents, exposed directory listings have led to mass downloads of user data, leaked source code, and exposed database backups that were sitting in a publicly accessible folder the developer thought nobody would find.
+
+---
 
 ## 🛡️ Remediation Strategies
 
@@ -213,3 +221,16 @@ Or block all access entirely:
 ### Do not store sensitive files inside the web root
 
 Files that should never be publicly accessible — credentials, backups, configuration files — should live outside `/var/www/html/` entirely, in a location the web server cannot serve.
+
+---
+
+📊 Attack Chain Summary
+
+```
+1. Read robots.txt          →  found /.hidden listed as disallowed
+2. Visited /.hidden/        →  server returned directory listing instead of 403
+3. Explored the structure   →  3 levels of randomly named folders, README at each endpoint
+4. Identified the problem   →  17,576 folders to check, manual search impossible
+5. Wrote Python script      →  crawled all folders, printed unique README contents
+6. Flag found               →  one README contained the flag among French decoy messages
+```
