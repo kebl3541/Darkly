@@ -1,4 +1,4 @@
-# 🚩 9 Open Redirect
+# 🚩 9: Open Redirect
 
 ---
 
