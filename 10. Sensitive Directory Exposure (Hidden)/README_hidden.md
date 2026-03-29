@@ -165,7 +165,6 @@ This version visits every folder it can find, tries to read a README at each lev
 
 ```
 FLAG: d5eec3ec36cf80dce44a896f961c1831a05526ec215693c8f2c39543497d4466
-
 ```
 
 ## 🌍 Real-World Impact
@@ -174,7 +173,7 @@ Directory listing on its own might seem minor. You can see filenames but not nec
 
 In real-world incidents, exposed directory listings have led to mass downloads of user data, leaked source code, and exposed database backups that were sitting in a publicly accessible folder the developer thought nobody would find.
 
-## 🛡️ Remediation
+## 🛡️ Remediation Strategies
 
 ### Disable directory listing
 
