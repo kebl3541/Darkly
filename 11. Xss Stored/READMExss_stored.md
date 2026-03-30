@@ -1,4 +1,4 @@
-# 🚩 10 : Stored XSS via Input Field (Client-Side Validation Bypass)
+# 🚩 11 : Stored XSS via Input Field (Client-Side Validation Bypass)
 
 ------------------------------------------------------------------------
 
