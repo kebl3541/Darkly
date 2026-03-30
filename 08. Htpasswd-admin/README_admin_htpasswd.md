@@ -168,7 +168,7 @@ The fourth failure was using MD5 to hash the password. MD5 has been considered c
 
 Any one of these failures alone would have been a problem. Together they created a clear path from a public text file to full admin access.
 
-## 🛡️ Remediation
+## 🛡️ Remediation Strategies
 
 ### Never use robots.txt to hide sensitive content
 
