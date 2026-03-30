@@ -1,0 +1,391 @@
+# 🚩 13 : XSS via Data URI
+
+## 📝 Overview
+
+The `media` page at `?page=media` is vulnerable to cross‑site scripting (XSS) because it accepts a user‑controlled `src` parameter and uses it directly as the source of an embedded resource without proper filtering. An attacker can place an XSS payload inside a `data:` URI in the `src` parameter, causing the browser to execute JavaScript and trigger the flag. The exploit is more subtle than a normal `<script>alert(1)</script>` in a form field because it abuses the `src` parameter of the media page, which is treated as a URL, not as raw HTML input. This makes it a classic example of XSS achieved through a `data:` URI bypass, where the payload lives inside a URL that looks like harmless content but actually runs code when rendered in the correct context.
+
+---
+
+## 🔍 The Vulnerability
+
+### The `src` parameter as a trusted source
+
+The `media` page expects a parameter `src` that tells it where to load content:
+
+```text
+http://[VM-IP]/?page=media&src=...
+```
+
+Behind the scenes, this `src` value is likely used in an HTML element such as `<object>` or `<iframe>`:
+
+```html
+<object data="[ src value ]">
+```
+
+Because the application treats `src` as a “safe” URL rather than untrusted input, it does not properly filter or escape the value before embedding it into the page. This trust in the `src` parameter is the root of the vulnerability: any attacker‑controlled value in `src` can be turned into a rich HTML context, provided the browser accepts it as a valid resource.
+
+### What is a `data:` URI?
+
+A `data:` URI is a special kind of URL that embeds its own content directly inside the URL, instead of pointing to a separate file on the server. The general format is:
+
+```text
+data:[MIME‑type],[content]
+```
+
+For example:
+
+```text
+data:text/html,<h1>Hello</h1>
+```
+
+Here:
+- `data:` indicates this is an inline data‑URI.
+- `text/html` tells the browser this is HTML.
+- `<h1>Hello</h1>` is the HTML content itself.
+
+If the browser receives such a URL in the `src` of an object or frame‑like element, it will render that HTML as a tiny embedded page. If the HTML contains a `<script>...</script>` tag, the script runs. This means a `data:` URI can be turned into a self‑hosting XSS payload that never touches the server’s filesystem.
+
+### Why filters often miss `data:` URIs
+
+Many XSS filters focus on things like:
+- Blocking `<script>` tags in form fields.
+- Blocking `javascript:` URLs in attributes like `href` or `src`.
+- Removing or escaping common XSS characters (`<`, `>`, `"`).
+
+However, a `data:` URI such as:
+
+```text
+data:text/html,<script>alert(1);</script>
+```
+
+does not:
+- Contain a `javascript:` scheme.
+- Appear inside a `value` of an input field.
+- Look like classic “script‑like” HTML to very simple filters.
+
+This makes it a common bypass technique in XSS filter evasion: instead of injecting the script in the normal places, the attacker smuggles it inside a `data:` URL that the browser happily renders as HTML.
+
+---
+
+## 🧠 How We Found the Attack Vector
+
+### Step 1: Inspecting the home page
+
+The first step is to load the main page of the Darkly VM in a browser and inspect its HTML source (right‑click → “View page source”). Among the HTML, there is a link or object element that references the `media` page via a URL containing `src`:
+
+```html
+<a href="?page=media&src=nsa">
+```
+
+or:
+
+```html
+<object data="?page=media&src=nsa">
+```
+
+From this, we learn:
+- There is a `media` page.
+- That page takes a `src` parameter.
+- The `src` value is being used as the source of an embedded resource.
+
+This suggests that if `src` is user‑controlled, it may be possible to manipulate it to serve arbitrary content rather than a fixed file.
+
+### Step 2: Confirming `src` is user‑controlled
+
+To confirm the `src` parameter is not just cosmetic, we can experiment with different values:
+
+```text
+http://[VM-IP]/?page=media&src=anything
+http://[VM-IP]/?page=media&src=123
+```
+
+If the page continues to render content based on `src`, it strongly suggests the parameter is being used as a real source path or URL, not just a display label. This confirms that an attacker can supply any value there, including special schemes such as `data:`.
+
+---
+
+## 🛠 The Exploit
+
+### Step 1 : Crafting a basic data‑URI payload
+
+To exploit the vulnerability, we start by crafting a `data:` URI that contains a simple script:
+
+```text
+<script>alert(1);</script>
+```
+
+As a full `data:` URI that renders HTML, this becomes:
+
+```text
+data:text/html,<script>alert(1);</script>
+```
+
+This means: “load HTML content, and that content is a `<script>` tag that runs `alert(1)`.”
+
+We plug this into the `src` parameter:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html,<script>alert(1);</script>
+```
+
+If XSS is possible in this context, the browser will:
+- Load the `media` page.
+- Insert the `data:` URI as the embedded resource.
+- Render the tiny HTML page containing `<script>alert(1);</script>`.
+- Run the script, showing an alert box.
+
+Seeing this alert proves that the `data:` URI is being treated as executable HTML, which is the core of the XSS.
+
+### Step 2 : Base64‑encoded variant (bypass technique)
+
+Some filters or WAFs block literal `<script>` tags in URLs or attributes but ignore base‑64–encoded versions. To bypass this, we can encode our script into base‑64.
+
+In a Linux terminal:
+
+```bash
+echo '<script>alert(1);</script>' | base64
+```
+
+This outputs something like:
+
+```text
+PHNjcmlwdD5hbGVydCgxKTs8L3NjcmlwdD4K
+```
+
+The `data:` URI now becomes:
+
+```text
+data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTs8L3NjcmlwdD4K
+```
+
+We plug it into the URL:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTs8L3NjcmlwdD4K
+```
+
+Again, the browser will decode the base‑64 payload, find the `<script>alert(1);</script>` tag, and run it, showing the same alert box. This demonstrates that the vulnerability is not blocked merely by rewriting the script in a different encoding.
+
+### Step 3 : Using the flag‑triggering payload
+
+The `alert(1)` proof‑of‑concept proves that XSS is possible, but the Darkly app does not award the flag for any generic script. Instead, it expects a **specific payload** that matches an internal trigger, typically based on a named script or identifier. External write‑ups and the lab’s structure suggest that the app is looking for a script containing the word `flag13` (or `FLAG13`) inside the `data:` payload.
+
+To get the flag, the payload is changed from:
+
+```text
+<script>alert(1);</script>
+```
+
+to:
+
+```text
+<script>flag13</script>
+```
+
+As a full `data:` URI:
+
+```text
+data:text/html,<script>flag13</script>
+```
+
+Then we send:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html,<script>flag13</script>
+```
+
+Here:
+- `?page=media` opens the media page.
+- `&src=data:text/html,<script>flag13</script>` tells the page to load a self‑contained HTML resource.
+- Inside that resource, `<script>flag13</script>` runs.
+- The application notices that `flag13` is executed and marks the challenge as completed, returning the flag.
+
+This is the same idea as the `alert(1)` test, but instead of showing a popup, the payload triggers the lab’s internal flag‑unlocking logic.
+
+### Step 4 : Base64‑encoded flag‑triggering payload (optional)
+
+If URL‑slashes or angles cause issues, we can encode the flag‑triggering script in base‑64 as well:
+
+```bash
+echo '<script>flag13</script>' | base64
+```
+
+This outputs something like:
+
+```text
+PHNjcmlwdD5mbGFnMTM8L3NjcmlwdD4K
+```
+
+Then:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html;base64,PHNjcmlwdD5mbGFnMTM8L3NjcmlwdD4K
+```
+
+This is functionally identical to the plaintext version: the browser decodes the base‑64, renders the HTML, runs the `<script>flag13</script>`, and the flag is captured. Using base‑64 can help bypass URL‑encoding or character‑filtering issues while keeping the same exploit logic.
+
+---
+
+## 🤖 Why the payload “works” visually but not automatically
+
+The `README` in the `13-XSS_data_uri` folder notes that:
+
+> “It works!! Unfortunately, it seems this is not recognized by the project.”
+
+This means:
+
+- The `data:text/html,<script>alert(1);</script>` payload **visually works** — the alert appears, so XSS is confirmed.
+- However, the **flag‑capture mechanism** inside the lab does not respond to `alert(1)` or to any generic script; it only responds to a specific form of the payload, likely involving `flag13` or a similar magic string.
+- The lab is designed to accept only the exact payload that the creator intended, not every XSS variation that happens to pop an alert.
+
+In real‑world terms, this is similar to a web app logging that an XSS payload was executed but not counting it as “exploited” unless the payload steals a specific token or value. The alert is enough to prove a bug, but the lab wants a precise payload to award the flag.
+
+---
+
+## 🏁 Result
+
+When the correct payload is used:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html,<script>flag13</script>
+```
+
+or its base‑64 equivalent:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html;base64,PHNjcmlwdD5mbGFnMTM8L3NjcmlwdD4K
+```
+
+the Darkly application recognizes that the `flag13` script has executed and returns the flag string. This is typically visible either:
+- Directly on the page, as a `FLAG: ...` message, or
+- As a newly “unlocked” file in the `13-XSS_data_uri/flag` path, which can be inspected afterward to confirm the breach is complete.
+
+The final outcome is that the attacker has successfully:
+- Injected a script into a `data:` URI.
+- Passed it through the `src` parameter of the `media` page.
+- Triggered the script in the browser, satisfying the lab’s flag‑unlocking logic.
+
+This completes breach 13 and demonstrates that even non‑script‑like parameters such as `src` can become XSS vectors if they accept data‑URI‑style content.
+
+---
+
+## 🌍 Real‑World Impact
+
+XSS via `data:` URIs is a real and often overlooked class of cross‑site scripting attacks. In web applications, URLs are commonly accepted in places such as `src`, `href`, `data`, or `code` attributes, and they are treated as “safe” because they look like normal links. However, if those attributes accept `data:` URIs, an attacker can smuggle malicious HTML and JavaScript directly into the page without needing to upload files or inject scripts into form fields.
+
+In real‑world scenarios, this has been used to:
+- Deliver phishing‑like HTML inside embedded objects.
+- Bypass naive XSS filters that block `javascript:` but allow `data:`.
+- Steal cookies or authentication tokens by exfiltrating them to an attacker‑controlled server via `data:`‑based requests.
+
+Because `data:` URIs are still valid URLs and are supported by all major browsers, this technique remains a viable bypass path in many applications that rely on simple input filtering rather than context‑aware escaping and validation.
+
+---
+
+## 🛡️ Remediation Strategies
+
+### Avoid executing user‑controlled data‑URIs
+
+The simplest defense is to **never treat user‑controlled input as a `data:` URI** unless the application explicitly intends to support it. In this case, the `src` parameter should not be used directly as the `data` URL of an embedded resource; instead, it should be treated as a **safe identifier** (for example, a file key or internal reference), and the actual resource URL should be built on the server using a controlled template:
+
+```php
+$allowed_keys = ['nsa', 'news', 'about'];
+$src = $_GET['src'];
+
+if (in_array($src, $allowed_keys)) {
+    $safe_url = "/resources/$src.html";
+}
+```
+
+This removes the ability of an attacker to inject a `data:text/html,...` payload into the `src` parameter entirely.
+
+### Implement strict input validation and whitelisting
+
+Where user‑controlled URLs must be accepted, the server should:
+- Parse the URL and **inspect its scheme** (e.g., `http://`, `https://`, `file://`, `data:`).
+- **Block `data:` and `javascript:` schemes** in any DOM‑level URL context such as `src`, `href`, or `data`.
+- Only allow trusted schemes and domains, using a strict whitelist.
+
+Code‑level validation in PHP or similar languages can prevent malicious‑looking URLs from reaching the renderer, even if the client sends them.
+
+### Follow OWASP XSS prevention principles
+
+The OWASP XSS Prevention Cheat Sheet recommends that content should be **escaped based on context** (HTML, attribute, JavaScript, URL). For a `src` parameter used in a URL context, the server should:
+- Validate the parameter strictly (e.g., only allow alphanumeric strings or known keys).
+- If the parameter is allowed to be a URL, ensure it does not start with `data:` or `javascript:`.
+- Escape or rewrite dangerous characters so that injected payloads cannot form valid HTML or script tags.
+
+This context‑aware escaping ensures that even if an attacker manages to inject malformed content, it will not be interpreted as executable code by the browser.
+
+### Apply content‑security policy (CSP)
+
+Modern web applications can further reduce the risk of XSS by implementing a **Content Security Policy (CSP)**. A carefully crafted CSP can:
+- Disallow inline scripts (`unsafe‑inline`).
+- Block `data:` URIs containing scripts from being executed.
+- Restrict which domains are allowed to load scripts or objects.
+
+Even if an attacker bypasses basic filters with a `data:` URI, a strict CSP can prevent the browser from executing the script in the first place, turning a potential XSS into a visible but harmless error.
+
+### Audit and fuzz URL‑like parameters
+
+Finally, developers should treat any parameter that ends up in a URL attribute (`src`, `href`, `data`, `codebase`, etc.) as **high‑risk** and subject it to the same review as classic XSS vectors. Automated security scanners and fuzzers can be used to:
+- Inject `data:` and `javascript:`‑style payloads into every URL‑consumed parameter.
+- Check whether the renderer ever executes script content or renders unescaped HTML.
+
+This proactive testing helps catch data‑URI–based XSS before the application is released to users. 
+
+---
+
+## 📊 Attack Chain Summary
+
+1. Inspected home page HTML and found link to ?page=media&src=...
+
+2. Confirmed that src is user‑controlled by experimenting with harmless values
+
+3. Crafted a data:text/html payload containing <script>alert(1);</script> and injected it via src
+
+4. Observed successful XSS (alert box) but no flag trigger
+
+5. Switched to the flag‑triggering payload: <script>flag13</script> in the data URI
+
+6. Sent the final URL with data:text/html,<script>flag13</script> in src
+
+7. The application detected the flag13 script and returned the flag
+
+
+---
+
+## 💡 Explaining the command step‑by‑step for dummies
+
+If you’re wondering **why** this command works, here’s the simplest way to think about it, line by line:
+
+- `http://[VM-IP]/?page=media`  
+  → This part just says: “open the `media` page on the Darkly VM.”
+
+- `&src=...`  
+  → This adds a parameter called `src` to the URL, which the app uses as the **source** of an embedded object or frame.
+
+- `data:text/html,<script>flag13</script>`  
+  → This is the “trick” piece:
+  - `data:` says: “I am not a normal file path; I am inline data.”
+  - `text/html` says: “This data is HTML.”
+  - `<script>flag13</script>` says: “Inside this HTML, run a tiny script that contains the word `flag13`.”
+
+So when you put it all together:
+
+```text
+http://[VM-IP]/?page=media&src=data:text/html,<script>flag13</script>
+```
+
+you’re really telling the app:
+
+1. “Open the `media` page.”
+2. “Load an embedded resource whose `src` is not a file, but a piece of HTML you are giving me inline.”
+3. “That HTML contains a `<script>` tag that just says `flag13`.”
+4. “Run that script.”
+
+The browser sees this `data:` URI, treats it like a mini webpage, and runs the script inside it. The Darkly app is coded to **look for that exact script** (or the word `flag13`) somewhere in the page, and when it sees it, it unlocks and shows the flag.
+
+In short:
+- The `data:` URI is the “magic envelope” for the payload.
+- The `<script>flag13</script>` is the “magic phrase” the lab is listening for.
+- Putting both of them into `src` is what makes the **flag appear**, not just a popup.
