@@ -74,7 +74,7 @@ This mirrors real‑world penetration‑testing workflows and helps you internal
 
 - A **Linux Kali** or similar offensive‑sec machine (recommended for tooling).
 - **VirtualBox** (or another VM runner).
-- The **Darkly ISO** or OVA (check `Resources/`).
+- The **Darkly ISO** or OVA.
 - Basic familiarity with:
   - Browsers and `curl`
   - HTML/HTTP concepts
@@ -83,7 +83,7 @@ This mirrors real‑world penetration‑testing workflows and helps you internal
 ### Steps
 
 1. **Download the Darkly VM image**  
-   - Get the ISO or OVA from your course platform or the `Resources/` folder of this repo.
+   - Get the ISO or OVA from your school or similar.
 
 2. **Import the VM and start it**  
    - Open VirtualBox → `Import Appliance` or create a new Linux VM and attach the ISO.
@@ -182,8 +182,6 @@ Our `Darkly/` structure looks more or less like this:
 ├── 12-survey_bad_design
 ├── 13-XSS_data_uri
 ├── 14-Stored_XSS_feedback
-├── Resources
-├── flag
 └── README.md
 ```
 
